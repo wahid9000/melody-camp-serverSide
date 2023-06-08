@@ -13,7 +13,6 @@ app.get("/", (req, res) => {
 });
 
 
-
 const uri =
   `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.wy87kp4.mongodb.net/?retryWrites=true&w=majority`;
 
@@ -30,6 +29,22 @@ async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
+
+    const classesCollection = client.db('melodyDB').collection('classesCollection');
+    const instructorsCollection = client.db('melodyDB').collection('instructorsCollection');
+
+
+    app.get('/classes', async(req, res) => {
+        const result = await classesCollection.find().sort({ students_number: -1 }).toArray();
+        res.send(result)
+    })
+
+
+    app.get('/instructors', async(req, res) => {
+        const result = await instructorsCollection.find().toArray();
+        res.send(result);
+    })
+
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
