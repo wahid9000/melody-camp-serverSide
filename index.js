@@ -1,7 +1,7 @@
 const express = require("express");
 const app = express();
 const cors = require("cors");
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const port = process.env.PORT || 5000;
 require("dotenv").config();
 
@@ -32,14 +32,63 @@ async function run() {
 
     const classesCollection = client.db('melodyDB').collection('classesCollection');
     const instructorsCollection = client.db('melodyDB').collection('instructorsCollection');
+    const mySelectedClassCollection = client.db('melodyDB').collection('selectedClassCollection');
+    const allUsersCollection = client.db('melodyDB').collection('allUsersCollection');
+
+    //users related API's
+    app.post('/users', async(req, res) => {
+      const saveUser = req.body;
+
+      const query = {email: saveUser.email}
+      const existingUser = await allUsersCollection.findOne(query);
+      console.log(existingUser);
+      if(existingUser){
+        return res.send({message: "User already exists"})
+      }
+
+      const result = await allUsersCollection.insertOne(saveUser);
+      res.send(result);
+    })
 
 
+    
+    //mySelectedClass related API
+    app.get('/mySelectedClass', async(req, res) => {
+        const email = req.query.email;
+        if(!email){
+            res.send([])
+        }
+        const query = {email: email}
+        const result = await mySelectedClassCollection.find(query).toArray();
+        res.send(result);
+    })
+
+    app.post('/mySelectedClass', async(req, res) => {
+        const selectedClass = req.body;
+        const result = await mySelectedClassCollection.insertOne(selectedClass)
+        res.send(result)
+    })
+
+    app.delete('/mySelectedClass/:id', async(req, res) => {
+        const id = req.params.id;
+        const query = {_id: new ObjectId(id)}
+        const result = await mySelectedClassCollection.deleteOne(query);
+        res.send(result);
+    })
+    
+
+
+    
+    //classes related API
     app.get('/classes', async(req, res) => {
         const result = await classesCollection.find().sort({ students_number: -1 }).toArray();
         res.send(result)
     })
 
 
+
+
+    //instructors related API
     app.get('/instructors', async(req, res) => {
         const result = await instructorsCollection.find().toArray();
         res.send(result);
