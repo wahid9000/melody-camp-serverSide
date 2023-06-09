@@ -72,29 +72,31 @@ async function run() {
       res.send({ token });
     });
 
-
-    const verifyAdmin = async(req, res, next) => {
+    const verifyAdmin = async (req, res, next) => {
       const email = req.decoded.email;
-      const query = {email: email}
+      const query = { email: email };
       const user = await allUsersCollection.findOne(query);
 
-      if(user?.role !== 'admin'){
-        return res.status(403).send({error: true, message: 'Only Admin Can Access'})
+      if (user?.role !== "admin") {
+        return res
+          .status(403)
+          .send({ error: true, message: "Only Admin Can Access" });
       }
       next();
-    }
+    };
 
-    const verifyInstructor = async(req, res, next) => {
+    const verifyInstructor = async (req, res, next) => {
       const email = req.query.email;
-      const query = {email: email}
+      const query = { email: email };
       const user = await allUsersCollection.findOne(query);
 
-      if(user?.role !== 'instructor'){
-        return res.status(401).send({error: true, message: 'Only Instructors can Access'})
+      if (user?.role !== "instructor") {
+        return res
+          .status(401)
+          .send({ error: true, message: "Only Instructors can Access" });
       }
       next();
-    }
-
+    };
 
     //users related API's
     app.get("/users", verifyJWT, verifyAdmin, async (req, res) => {
@@ -119,8 +121,8 @@ async function run() {
     app.get("/users/admin/:email", verifyJWT, async (req, res) => {
       const email = req.params.email;
 
-      if( req.decoded.email !== email ){
-        res.send({admin: false})
+      if (req.decoded.email !== email) {
+        res.send({ admin: false });
       }
 
       const query = { email: email };
@@ -141,11 +143,11 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/users/instructor/:email", verifyJWT,  async (req, res) => {
+    app.get("/users/instructor/:email", verifyJWT, async (req, res) => {
       const email = req.params.email;
 
-      if( req.decoded.email !== email ){
-        res.send({instructor: false})
+      if (req.decoded.email !== email) {
+        res.send({ instructor: false });
       }
 
       const query = { email: email };
@@ -199,16 +201,55 @@ async function run() {
       res.send(result);
     });
 
-    //classes related API
+    //instructor related API
     app.get("/classes", async (req, res) => {
-      const result = await classesCollection
-        .find()
-        .sort({ students_number: -1 })
-        .toArray();
+      const result = await classesCollection.find().toArray(); // .sort({ students_number: -1 })
       res.send(result);
     });
 
-    //instructors related API
+    app.post("/classes", async (req, res) => {
+      const classes = req.body;
+      const result = await classesCollection.insertOne(classes);
+      res.send(result);
+    });
+
+    app.patch("/classes/approve/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          status: "Approved",
+        },
+      };
+      const result = await classesCollection.updateOne(query, updateDoc);
+      res.send(result);
+    });
+
+    app.patch("/classes/deny/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          status: "Denied",
+        },
+      };
+      const result = await classesCollection.updateOne(query, updateDoc);
+      res.send(result);
+    });
+
+    app.get(
+      "/instructorClasses",
+      verifyJWT,
+      verifyInstructor,
+      async (req, res) => {
+        const email = req.query.email;
+        const query = { instructor_email: email };
+        const result = await classesCollection.find(query).toArray();
+        res.send(result);
+      }
+    );
+
+    //popular instructors (Fake Data API)
     app.get("/instructors", async (req, res) => {
       const result = await instructorsCollection.find().toArray();
       res.send(result);
