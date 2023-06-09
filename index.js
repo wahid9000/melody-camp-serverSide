@@ -1,13 +1,35 @@
 const express = require("express");
 const app = express();
 const cors = require("cors");
-const jwt = require('jsonwebtoken');
+const jwt = require("jsonwebtoken");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const port = process.env.PORT || 5000;
 require("dotenv").config();
 
+//middlewares
 app.use(cors());
 app.use(express.json());
+
+const verifyJWT = (req, res, next) => {
+  const authorization = req.headers.authorization;
+  if (!authorization) {
+    return res
+      .status(401)
+      .send({ error: true, message: "Unauthorized access" });
+  }
+
+  const token = authorization.split(" ")[1];
+
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (error, decoded) => {
+    if (error) {
+      return res
+        .status(401)
+        .send({ error: true, message: "Unauthorized Access" });
+    }
+    req.decoded = decoded;
+    next();
+  });
+};
 
 app.get("/", (req, res) => {
   res.send("Melody Server is Running");
@@ -42,9 +64,40 @@ async function run() {
       .db("melodyDB")
       .collection("allUsersCollection");
 
-    //users related API's
+    app.post("/jwt", (req, res) => {
+      const user = req.body;
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: "1hr",
+      });
+      res.send({ token });
+    });
 
-    app.get("/users", async (req, res) => {
+
+    const verifyAdmin = async(req, res, next) => {
+      const email = req.decoded.email;
+      const query = {email: email}
+      const user = await allUsersCollection.findOne(query);
+
+      if(user?.role !== 'admin'){
+        return res.status(403).send({error: true, message: 'Only Admin Can Access'})
+      }
+      next();
+    }
+
+    const verifyInstructor = async(req, res, next) => {
+      const email = req.query.email;
+      const query = {email: email}
+      const user = await allUsersCollection.findOne(query);
+
+      if(user?.role !== 'instructor'){
+        return res.status(401).send({error: true, message: 'Only Instructors can Access'})
+      }
+      next();
+    }
+
+
+    //users related API's
+    app.get("/users", verifyJWT, verifyAdmin, async (req, res) => {
       const result = await allUsersCollection.find().toArray();
       res.send(result);
     });
@@ -63,6 +116,19 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/users/admin/:email", verifyJWT, async (req, res) => {
+      const email = req.params.email;
+
+      if( req.decoded.email !== email ){
+        res.send({admin: false})
+      }
+
+      const query = { email: email };
+      const user = await allUsersCollection.findOne(query);
+      const result = { admin: user?.role === "admin" };
+      res.send(result);
+    });
+
     app.patch("/users/admin/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
@@ -72,6 +138,19 @@ async function run() {
         },
       };
       const result = await allUsersCollection.updateOne(query, updateDoc);
+      res.send(result);
+    });
+
+    app.get("/users/instructor/:email", verifyJWT,  async (req, res) => {
+      const email = req.params.email;
+
+      if( req.decoded.email !== email ){
+        res.send({instructor: false})
+      }
+
+      const query = { email: email };
+      const user = await allUsersCollection.findOne(query);
+      const result = { instructor: user?.role === "instructor" };
       res.send(result);
     });
 
@@ -87,15 +166,21 @@ async function run() {
       res.send(result);
     });
 
-
-
-
     //mySelectedClass related API
-    app.get("/mySelectedClass", async (req, res) => {
+    app.get("/mySelectedClass", verifyJWT, async (req, res) => {
       const email = req.query.email;
+      const decodedEmail = req.decoded.email;
+
       if (!email) {
         res.send([]);
       }
+
+      if (email !== decodedEmail) {
+        return res
+          .status(403)
+          .send({ error: true, message: "Forbidden Access" });
+      }
+
       const query = { email: email };
       const result = await mySelectedClassCollection.find(query).toArray();
       res.send(result);
