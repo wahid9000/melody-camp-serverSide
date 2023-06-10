@@ -1,15 +1,18 @@
 const express = require("express");
 const app = express();
 const cors = require("cors");
-const jwt = require("jsonwebtoken");
-const stripe = require('stripe')(process.env.PAYMENT_SECRET_KEY);
-const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
-const port = process.env.PORT || 5000;
 require("dotenv").config();
+const jwt = require("jsonwebtoken");
+const port = process.env.PORT || 5000;
+const stripe = require("stripe")(process.env.PAYMENT_SECRET_KEY);
 
 //middlewares
 app.use(cors());
 app.use(express.json());
+
+app.get("/", (req, res) => {
+  res.send("Melody Server is Running");
+});
 
 const verifyJWT = (req, res, next) => {
   const authorization = req.headers.authorization;
@@ -32,10 +35,7 @@ const verifyJWT = (req, res, next) => {
   });
 };
 
-app.get("/", (req, res) => {
-  res.send("Melody Server is Running");
-});
-
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.wy87kp4.mongodb.net/?retryWrites=true&w=majority`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -52,26 +52,34 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
 
-    const classesCollection = client
-      .db("melodyDB")
-      .collection("classesCollection");
-    const instructorsCollection = client
-      .db("melodyDB")
-      .collection("instructorsCollection");
-    const mySelectedClassCollection = client
-      .db("melodyDB")
-      .collection("selectedClassCollection");
-    const allUsersCollection = client
-      .db("melodyDB")
-      .collection("allUsersCollection");
 
+
+    // -----------------------  Collections -----------------------------
+
+    const allUsersCollection = client.db("melodyDB").collection("allUsersCollection");
+    const classesCollection = client.db("melodyDB").collection("classesCollection");
+    const mySelectedClassCollection = client.db("melodyDB").collection("selectedClassCollection");
+    const instructorsCollection = client.db("melodyDB").collection("instructorsCollection");
+    const paymentCollection = client.db('melodyDB').collection('paymentCollection');
+    
+
+
+
+    //------------------------   JWT API  -------------------------
+    
     app.post("/jwt", (req, res) => {
       const user = req.body;
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
-        expiresIn: "1hr",
+        expiresIn: "1h",
       });
+
       res.send({ token });
     });
+
+
+
+
+    //------------------  Verify Admin And Instructor Middlewares  ---------------------
 
     const verifyAdmin = async (req, res, next) => {
       const email = req.decoded.email;
@@ -99,11 +107,17 @@ async function run() {
       next();
     };
 
-    //users related API's
+
+
+
+
+    //-----------------   Users related API's  ---------------------------
+
     app.get("/users", verifyJWT, verifyAdmin, async (req, res) => {
       const result = await allUsersCollection.find().toArray();
       res.send(result);
     });
+
 
     app.post("/users", async (req, res) => {
       const saveUser = req.body;
@@ -119,6 +133,14 @@ async function run() {
       res.send(result);
     });
 
+
+
+
+    //----------------- User Role change API --------------------------
+
+
+
+
     app.get("/users/admin/:email", verifyJWT, async (req, res) => {
       const email = req.params.email;
 
@@ -132,17 +154,6 @@ async function run() {
       res.send(result);
     });
 
-    app.patch("/users/admin/:id", async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const updateDoc = {
-        $set: {
-          role: "admin",
-        },
-      };
-      const result = await allUsersCollection.updateOne(query, updateDoc);
-      res.send(result);
-    });
 
     app.get("/users/instructor/:email", verifyJWT, async (req, res) => {
       const email = req.params.email;
@@ -157,6 +168,20 @@ async function run() {
       res.send(result);
     });
 
+
+    app.patch("/users/admin/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          role: "admin",
+        },
+      };
+      const result = await allUsersCollection.updateOne(query, updateDoc);
+      res.send(result);
+    });
+
+
     app.patch("/users/instructor/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
@@ -170,7 +195,13 @@ async function run() {
     });
 
 
-    //mySelectedClass related API
+
+
+
+    //------------------------  mySelectedClass related API  -----------------------
+
+
+
     app.get("/mySelectedClass", verifyJWT, async (req, res) => {
       const email = req.query.email;
       const decodedEmail = req.decoded.email;
@@ -190,20 +221,18 @@ async function run() {
       res.send(result);
     });
 
-    app.get('/mySelectedClass/:id', async(req, res) => {
+    app.get("/mySelectedClass/:id", async (req, res) => {
       const id = req.params.id;
-      const query= {_id: new ObjectId(id)}
+      const query = { _id: new ObjectId(id) };
       const result = await mySelectedClassCollection.findOne(query);
-      res.send(result)
-    })
-
+      res.send(result);
+    });
 
     app.post("/mySelectedClass", async (req, res) => {
       const selectedClass = req.body;
       const result = await mySelectedClassCollection.insertOne(selectedClass);
       res.send(result);
     });
-
 
     app.delete("/mySelectedClass/:id", async (req, res) => {
       const id = req.params.id;
@@ -213,33 +242,71 @@ async function run() {
     });
 
 
-    //stripe create-payment-intent
 
-    app.post('/create-payment-intent', async(req, res) => {
-      const {price} = req.body;
-      const amount = price*100
+
+
+
+    //------------------- Stripe create-payment-intent API ------------------------
+
+
+    app.post("/create-payment-intent", verifyJWT, async (req, res) => {
+      const { price } = req.body;
+      const amount = price * 100;
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amount,
-        currency: 'usd',
-        payment_method_types: ['card']
-      })
+        currency: "usd",
+        payment_method_types: ["card"],
+      });
       res.send({
         clientSecret: paymentIntent.client_secret,
-      })
+      });
+    });
+
+
+
+
+    //----------------------  Payment Related API  ----------------------------
+
+    app.post('/payments', verifyJWT,  async(req, res)=> {
+      const payment = req.body;
+      const insertResult = await paymentCollection.insertOne(payment);
+
+      const query = {_id: {$in: [new ObjectId(payment.selectedClassId)]}}
+      const deleteResult = await mySelectedClassCollection.deleteOne(query)
+      res.send({insertResult, deleteResult});
     })
 
-    //instructor related API
+
+
+
+
+    //------------------------  Payment History Related API  ------------------
+
+
+    app.get('/paymentHistory', async(req, res) => {
+      const result = await paymentCollection.find().toArray();
+      res.send(result);
+    })
+
+
+
+
+
+
+    //------------------- Instructor related API  --------------------------
+
+
     app.get("/classes", async (req, res) => {
       const result = await classesCollection.find().toArray(); // .sort({ students_number: -1 })
       res.send(result);
     });
 
-    app.get('/classes/:id', async(req, res) => {
+    app.get("/classes/:id", async (req, res) => {
       const id = req.params.id;
-      const query = {_id: new ObjectId(id)}
-      const result = await classesCollection.findOne(query)
+      const query = { _id: new ObjectId(id) };
+      const result = await classesCollection.findOne(query);
       res.send(result);
-    })
+    });
 
     app.post("/classes", async (req, res) => {
       const classes = req.body;
@@ -247,22 +314,26 @@ async function run() {
       res.send(result);
     });
 
-    app.put('/classes/:id', async(req, res) => {
+    app.put("/classes/:id", async (req, res) => {
       const id = req.params.id;
-      const query = {_id: new ObjectId(id)}
-      const options = {upsert: true}
+      const query = { _id: new ObjectId(id) };
+      const options = { upsert: true };
       const classInfo = req.body;
       const updateDoc = {
         $set: {
           class_name: classInfo.class_name,
           class_image: classInfo.class_image,
           available_seats: classInfo.available_seats,
-          price: classInfo.price
-        }
-      }
-      const result = await classesCollection.updateOne(query, updateDoc, options);
-      res.send(result)
-    })
+          price: classInfo.price,
+        },
+      };
+      const result = await classesCollection.updateOne(
+        query,
+        updateDoc,
+        options
+      );
+      res.send(result);
+    });
 
     app.patch("/classes/approve/:id", async (req, res) => {
       const id = req.params.id;
@@ -288,19 +359,18 @@ async function run() {
       res.send(result);
     });
 
-
-    app.patch('/classes/feedback/:id', async(req, res) => {
+    app.patch("/classes/feedback/:id", async (req, res) => {
       const id = req.params.id;
-      const query = {_id: new ObjectId(id)}
+      const query = { _id: new ObjectId(id) };
       const adminFeedback = req.body;
       const updateDoc = {
         $set: {
-          feedback: adminFeedback.feedback
-        }
-      }
+          feedback: adminFeedback.feedback,
+        },
+      };
       const result = await classesCollection.updateOne(query, updateDoc);
       res.send(result);
-    })
+    });
 
     app.get(
       "/instructorClasses",
