@@ -207,11 +207,35 @@ async function run() {
       res.send(result);
     });
 
+    app.get('/classes/:id', async(req, res) => {
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)}
+      const result = await classesCollection.findOne(query)
+      res.send(result);
+    })
+
     app.post("/classes", async (req, res) => {
       const classes = req.body;
       const result = await classesCollection.insertOne(classes);
       res.send(result);
     });
+
+    app.put('/classes/:id', async(req, res) => {
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)}
+      const options = {upsert: true}
+      const classInfo = req.body;
+      const updateDoc = {
+        $set: {
+          class_name: classInfo.class_name,
+          class_image: classInfo.class_image,
+          available_seats: classInfo.available_seats,
+          price: classInfo.price
+        }
+      }
+      const result = await classesCollection.updateOne(query, updateDoc, options);
+      res.send(result)
+    })
 
     app.patch("/classes/approve/:id", async (req, res) => {
       const id = req.params.id;
@@ -236,6 +260,20 @@ async function run() {
       const result = await classesCollection.updateOne(query, updateDoc);
       res.send(result);
     });
+
+
+    app.patch('/classes/feedback/:id', async(req, res) => {
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)}
+      const adminFeedback = req.body;
+      const updateDoc = {
+        $set: {
+          feedback: adminFeedback.feedback
+        }
+      }
+      const result = await classesCollection.updateOne(query, updateDoc);
+      res.send(result);
+    })
 
     app.get(
       "/instructorClasses",
