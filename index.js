@@ -111,13 +111,17 @@ async function run() {
 
 
 
-    //-----------------   Users related API's  ---------------------------
+    //-----------------   Admin Manage User's related API's  ---------------------------
 
     app.get("/users", verifyJWT, verifyAdmin, async (req, res) => {
       const result = await allUsersCollection.find().toArray();
       res.send(result);
     });
 
+
+
+
+    //------------------- User Info save related API -----------------------
 
     app.post("/users", async (req, res) => {
       const saveUser = req.body;
@@ -271,9 +275,17 @@ async function run() {
       const payment = req.body;
       const insertResult = await enrolledCollection.insertOne(payment);
 
+      //increase enrolledStudents by 1
+      const updateEnrolledQuery={_id: {$in: [new ObjectId(payment.classId)]}}
+      const updateEnrolledStudents = await classesCollection.findOneAndUpdate(updateEnrolledQuery,  { $inc: { enrolledStudents: 1 } });
+
+      //decrease availableSeats by 1
+      const updateSeatsQuery={_id: {$in: [new ObjectId(payment.classId)]}}
+      const updateSeats = await classesCollection.findOneAndUpdate(updateSeatsQuery,  { $inc: { available_seats: -1 } });
+
       const query = {_id: {$in: [new ObjectId(payment.selectedClassId)]}}
       const deleteResult = await mySelectedClassCollection.deleteOne(query)
-      res.send({insertResult, deleteResult});
+      res.send({insertResult, updateEnrolledStudents, updateSeats,  deleteResult});
     })
 
 
@@ -305,13 +317,47 @@ async function run() {
 
 
 
-    //------------------- Instructor related API  --------------------------
+    //------------------- Classes related API  --------------------------
 
 
-    app.get("/classes", async (req, res) => {
-      const result = await classesCollection.find().toArray(); // .sort({ students_number: -1 })
+
+    // -----------------  Managing Classes By Admin API ------------------------
+
+    app.get("/admin/manageClasses", verifyJWT, verifyAdmin, async (req, res) => {
+      const result = await classesCollection.find().toArray();
       res.send(result);
     });
+
+
+
+    // --------------- Popular Class API -------------------------
+
+    app.get("/classes", async (req, res) => {
+      const result = await classesCollection.find().sort({ enrolledStudents: -1 }).toArray(); // 
+      res.send(result);
+    });
+
+
+
+    //------------------  Popular Instructor API --------------------------
+
+    app.get('/instructors', async(req, res) => {
+      const result = await allUsersCollection.find().toArray();
+      res.send(result);
+    })
+
+
+
+    // ------------- Instructors Class API -----------------
+
+
+    app.get("/instructorClasses",verifyJWT,verifyInstructor,async (req, res) => {
+        const email = req.query.email;
+        const query = { instructor_email: email };
+        const result = await classesCollection.find(query).toArray();
+        res.send(result);
+      }
+    );
 
     app.get("/classes/:id", async (req, res) => {
       const id = req.params.id;
@@ -325,6 +371,7 @@ async function run() {
       const result = await classesCollection.insertOne(classes);
       res.send(result);
     });
+
 
     app.put("/classes/:id", async (req, res) => {
       const id = req.params.id;
@@ -347,7 +394,13 @@ async function run() {
       res.send(result);
     });
 
-    app.patch("/classes/approve/:id", async (req, res) => {
+
+
+
+
+    // ------------- Admin Class API -----------------------
+
+    app.patch("/admin/manageClasses/approve/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const updateDoc = {
@@ -359,7 +412,7 @@ async function run() {
       res.send(result);
     });
 
-    app.patch("/classes/deny/:id", async (req, res) => {
+    app.patch("/admin/manageClasses/deny/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const updateDoc = {
@@ -371,7 +424,7 @@ async function run() {
       res.send(result);
     });
 
-    app.patch("/classes/feedback/:id", async (req, res) => {
+    app.patch("/admin/manageClasses/feedback/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const adminFeedback = req.body;
@@ -384,23 +437,7 @@ async function run() {
       res.send(result);
     });
 
-    app.get(
-      "/instructorClasses",
-      verifyJWT,
-      verifyInstructor,
-      async (req, res) => {
-        const email = req.query.email;
-        const query = { instructor_email: email };
-        const result = await classesCollection.find(query).toArray();
-        res.send(result);
-      }
-    );
 
-    //popular instructors (Fake Data API)
-    app.get("/instructors", async (req, res) => {
-      const result = await instructorsCollection.find().toArray();
-      res.send(result);
-    });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
