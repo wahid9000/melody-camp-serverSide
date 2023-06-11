@@ -163,7 +163,7 @@ async function run() {
       const email = req.params.email;
 
       if (req.decoded.email !== email) {
-        res.send({ instructor: false });
+        return res.send({ instructor: false });
       }
 
       const query = { email: email };
@@ -292,9 +292,9 @@ async function run() {
 
 
 
-    //---------------------  Enrolled API --------------------------------
+    //--------------------- User Enrolled API --------------------------------
 
-    app.get('/enrolled', async(req, res) => {
+    app.get('/enrolled',verifyJWT,  async(req, res) => {
       const result = await enrolledCollection.find().toArray();
       res.send(result);
     })
@@ -307,7 +307,7 @@ async function run() {
     //------------------------  Payment History Related API  ------------------
 
 
-    app.get('/paymentHistory', async(req, res) => {
+    app.get('/paymentHistory',verifyJWT,  async(req, res) => {
       const result = await enrolledCollection.find().sort({date: -1}).toArray();
       res.send(result);
     })
@@ -366,7 +366,7 @@ async function run() {
       res.send(result);
     });
 
-    app.post("/classes", async (req, res) => {
+    app.post("/classes", verifyJWT,  async (req, res) => {
       const classes = req.body;
       const result = await classesCollection.insertOne(classes);
       res.send(result);
