@@ -4,7 +4,7 @@ const cors = require("cors");
 require("dotenv").config();
 const jwt = require("jsonwebtoken");
 const port = process.env.PORT || 5000;
-const stripe = require("stripe")(process.env.PAYMENT_SECRET_KEY);
+const stripe = require("stripe")(process.env.PAYMENT_SECRET_KEYS);
 
 //middlewares
 app.use(cors());
@@ -60,7 +60,7 @@ async function run() {
     const classesCollection = client.db("melodyDB").collection("classesCollection");
     const mySelectedClassCollection = client.db("melodyDB").collection("selectedClassCollection");
     const instructorsCollection = client.db("melodyDB").collection("instructorsCollection");
-    const paymentCollection = client.db('melodyDB').collection('paymentCollection');
+    const enrolledCollection = client.db("melodyDB").collection("enrolledCollection");
     
 
 
@@ -251,7 +251,7 @@ async function run() {
 
     app.post("/create-payment-intent", verifyJWT, async (req, res) => {
       const { price } = req.body;
-      const amount = price * 100;
+      const amount = Math.round( price * 100);
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amount,
         currency: "usd",
@@ -269,7 +269,7 @@ async function run() {
 
     app.post('/payments', verifyJWT,  async(req, res)=> {
       const payment = req.body;
-      const insertResult = await paymentCollection.insertOne(payment);
+      const insertResult = await enrolledCollection.insertOne(payment);
 
       const query = {_id: {$in: [new ObjectId(payment.selectedClassId)]}}
       const deleteResult = await mySelectedClassCollection.deleteOne(query)
@@ -280,11 +280,23 @@ async function run() {
 
 
 
+    //---------------------  Enrolled API --------------------------------
+
+    app.get('/enrolled', async(req, res) => {
+      const result = await enrolledCollection.find().toArray();
+      res.send(result);
+    })
+
+
+
+
+
+
     //------------------------  Payment History Related API  ------------------
 
 
     app.get('/paymentHistory', async(req, res) => {
-      const result = await paymentCollection.find().toArray();
+      const result = await enrolledCollection.find().sort({date: -1}).toArray();
       res.send(result);
     })
 
