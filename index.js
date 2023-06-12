@@ -50,7 +50,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
 
 
 
@@ -163,7 +163,7 @@ async function run() {
       const email = req.params.email;
 
       if (req.decoded.email !== email) {
-        return res.send({ instructor: false });
+        res.send({ instructor: false });
       }
 
       const query = { email: email };
@@ -338,7 +338,7 @@ async function run() {
       }
 
       const query = { email: email };
-      const result = await enrolledCollection.find(query).toArray();
+      const result = await enrolledCollection.find(query).sort({date: -1}).toArray();
       res.send(result);
     })
 
