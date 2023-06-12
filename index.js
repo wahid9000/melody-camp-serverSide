@@ -294,8 +294,23 @@ async function run() {
 
     //--------------------- User Enrolled API --------------------------------
 
-    app.get('/enrolled',verifyJWT,  async(req, res) => {
-      const result = await enrolledCollection.find().toArray();
+
+    app.get('/enrolled', verifyJWT,  async(req, res) => {
+      const email= req.query.email;
+      const decodedEmail = req.decoded.email;
+
+      if (!email) {
+        res.send([]);
+      }
+
+      if (email !== decodedEmail) {
+        return res
+          .status(403)
+          .send({ error: true, message: "Forbidden Access" });
+      }
+
+      const query = { email: email };
+      const result = await enrolledCollection.find(query).toArray();
       res.send(result);
     })
 
@@ -307,11 +322,27 @@ async function run() {
     //------------------------  Payment History Related API  ------------------
 
 
+
     app.get('/paymentHistory',verifyJWT,  async(req, res) => {
-      const result = await enrolledCollection.find().sort({date: -1}).toArray();
+      const email= req.query.email;
+      const decodedEmail = req.decoded.email;
+
+      if (!email) {
+        res.send([]);
+      }
+
+      if (email !== decodedEmail) {
+        return res
+          .status(403)
+          .send({ error: true, message: "Forbidden Access" });
+      }
+
+      const query = { email: email };
+      const result = await enrolledCollection.find(query).toArray();
       res.send(result);
     })
 
+   
 
 
 
