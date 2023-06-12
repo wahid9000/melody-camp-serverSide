@@ -59,7 +59,7 @@ async function run() {
     const allUsersCollection = client.db("melodyDB").collection("allUsersCollection");
     const classesCollection = client.db("melodyDB").collection("classesCollection");
     const mySelectedClassCollection = client.db("melodyDB").collection("selectedClassCollection");
-    const instructorsCollection = client.db("melodyDB").collection("instructorsCollection");
+    const reviewsCollection = client.db("melodyDB").collection("reviewsCollection");
     const enrolledCollection = client.db("melodyDB").collection("enrolledCollection");
     
 
@@ -436,6 +436,16 @@ async function run() {
       const result = await classesCollection.updateOne(query, updateDoc);
       res.send(result);
     });
+
+
+
+
+    //------------------- REviews API ----------------------------
+
+    app.get('/reviews', async(req, res) => {
+      const result = await reviewsCollection.find().toArray();
+      res.send(result)
+    })
 
 
 
