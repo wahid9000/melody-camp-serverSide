@@ -4,7 +4,7 @@ const cors = require("cors");
 require("dotenv").config();
 const jwt = require("jsonwebtoken");
 const port = process.env.PORT || 5000;
-const stripe = require("stripe")(process.env.PAYMENT_SECRET_KEY);
+const stripe = require("stripe")(process.env.PAYMENT_SECRET_KEYS);
 
 //middlewares
 app.use(cors());
@@ -59,8 +59,8 @@ async function run() {
     const allUsersCollection = client.db("melodyDB").collection("allUsersCollection");
     const classesCollection = client.db("melodyDB").collection("classesCollection");
     const mySelectedClassCollection = client.db("melodyDB").collection("selectedClassCollection");
-    const instructorsCollection = client.db("melodyDB").collection("instructorsCollection");
-    const paymentCollection = client.db('melodyDB').collection('paymentCollection');
+    const reviewsCollection = client.db("melodyDB").collection("reviewsCollection");
+    const enrolledCollection = client.db("melodyDB").collection("enrolledCollection");
     
 
 
@@ -255,7 +255,7 @@ async function run() {
 
     app.post("/create-payment-intent", verifyJWT, async (req, res) => {
       const { price } = req.body;
-      const amount = price * 100;
+      const amount = Math.round( price * 100);
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amount,
         currency: "usd",
@@ -273,12 +273,47 @@ async function run() {
 
     app.post('/payments', verifyJWT,  async(req, res)=> {
       const payment = req.body;
-      const insertResult = await paymentCollection.insertOne(payment);
+      const insertResult = await enrolledCollection.insertOne(payment);
+
+      //increase enrolledStudents by 1
+      const updateEnrolledQuery={_id: {$in: [new ObjectId(payment.classId)]}}
+      const updateEnrolledStudents = await classesCollection.findOneAndUpdate(updateEnrolledQuery,  { $inc: { enrolledStudents: 1 } });
+
+      //decrease availableSeats by 1
+      const updateSeatsQuery={_id: {$in: [new ObjectId(payment.classId)]}}
+      const updateSeats = await classesCollection.findOneAndUpdate(updateSeatsQuery,  { $inc: { available_seats: -1 } });
 
       const query = {_id: {$in: [new ObjectId(payment.selectedClassId)]}}
       const deleteResult = await mySelectedClassCollection.deleteOne(query)
-      res.send({insertResult, deleteResult});
+      res.send({insertResult, updateEnrolledStudents, updateSeats,  deleteResult});
     })
+
+
+
+
+
+    //--------------------- User Enrolled API --------------------------------
+
+
+    app.get('/enrolled', verifyJWT,  async(req, res) => {
+      const email= req.query.email;
+      const decodedEmail = req.decoded.email;
+
+      if (!email) {
+        res.send([]);
+      }
+
+      if (email !== decodedEmail) {
+        return res
+          .status(403)
+          .send({ error: true, message: "Forbidden Access" });
+      }
+
+      const query = { email: email };
+      const result = await enrolledCollection.find(query).toArray();
+      res.send(result);
+    })
+
 
 
 
@@ -287,8 +322,23 @@ async function run() {
     //------------------------  Payment History Related API  ------------------
 
 
-    app.get('/paymentHistory', async(req, res) => {
-      const result = await paymentCollection.find().toArray();
+
+    app.get('/paymentHistory',verifyJWT,  async(req, res) => {
+      const email= req.query.email;
+      const decodedEmail = req.decoded.email;
+
+      if (!email) {
+        res.send([]);
+      }
+
+      if (email !== decodedEmail) {
+        return res
+          .status(403)
+          .send({ error: true, message: "Forbidden Access" });
+      }
+
+      const query = { email: email };
+      const result = await enrolledCollection.find(query).sort({date: -1}).toArray();
       res.send(result);
     })
 
@@ -322,9 +372,8 @@ async function run() {
 
     //------------------  Popular Instructor API --------------------------
 
-  
-    app.get('/paymentHistory', async(req, res) => {
-      const result = await paymentCollection.find().toArray();
+    app.get('/instructors', async(req, res) => {
+      const result = await allUsersCollection.find().toArray();
       res.send(result);
     })
 
