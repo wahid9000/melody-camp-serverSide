@@ -277,7 +277,7 @@ async function run() {
 
       const query = {_id: {$in: [new ObjectId(payment.selectedClassId)]}}
       const deleteResult = await mySelectedClassCollection.deleteOne(query)
-      res.send({insertResult, updateEnrolledStudents, updateSeats,  deleteResult});
+      res.send({insertResult, deleteResult});
     })
 
 
