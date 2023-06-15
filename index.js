@@ -4,7 +4,7 @@ const cors = require("cors");
 require("dotenv").config();
 const jwt = require("jsonwebtoken");
 const port = process.env.PORT || 5000;
-const stripe = require("stripe")(process.env.PAYMENT_SECRET_KEYS);
+const stripe = require("stripe")(process.env.PAYMENT_SECRET_KEY);
 
 //middlewares
 app.use(cors());
@@ -59,8 +59,13 @@ async function run() {
     const allUsersCollection = client.db("melodyDB").collection("allUsersCollection");
     const classesCollection = client.db("melodyDB").collection("classesCollection");
     const mySelectedClassCollection = client.db("melodyDB").collection("selectedClassCollection");
+<<<<<<< HEAD
     const reviewsCollection = client.db("melodyDB").collection("reviewsCollection");
     const enrolledCollection = client.db("melodyDB").collection("enrolledCollection");
+=======
+    const instructorsCollection = client.db("melodyDB").collection("instructorsCollection");
+    const paymentCollection = client.db('melodyDB').collection('paymentCollection');
+>>>>>>> parent of caba563 (updated)
     
 
 
@@ -255,7 +260,7 @@ async function run() {
 
     app.post("/create-payment-intent", verifyJWT, async (req, res) => {
       const { price } = req.body;
-      const amount = Math.round( price * 100);
+      const amount = price * 100;
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amount,
         currency: "usd",
@@ -273,7 +278,7 @@ async function run() {
 
     app.post('/payments', verifyJWT,  async(req, res)=> {
       const payment = req.body;
-      const insertResult = await enrolledCollection.insertOne(payment);
+      const insertResult = await paymentCollection.insertOne(payment);
 
       //increase enrolledStudents by 1
       const updateEnrolledQuery={_id: {$in: [new ObjectId(payment.classId)]}}
@@ -292,6 +297,7 @@ async function run() {
 
 
 
+<<<<<<< HEAD
     //--------------------- User Enrolled API --------------------------------
 
 
@@ -374,6 +380,13 @@ async function run() {
 
     app.get('/instructors', async(req, res) => {
       const result = await allUsersCollection.find().toArray();
+=======
+    //------------------------  Payment History Related API  ------------------
+
+
+    app.get('/paymentHistory', async(req, res) => {
+      const result = await paymentCollection.find().toArray();
+>>>>>>> parent of caba563 (updated)
       res.send(result);
     })
 
