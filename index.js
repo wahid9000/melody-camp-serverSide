@@ -59,13 +59,8 @@ async function run() {
     const allUsersCollection = client.db("melodyDB").collection("allUsersCollection");
     const classesCollection = client.db("melodyDB").collection("classesCollection");
     const mySelectedClassCollection = client.db("melodyDB").collection("selectedClassCollection");
-<<<<<<< HEAD
-    const reviewsCollection = client.db("melodyDB").collection("reviewsCollection");
-    const enrolledCollection = client.db("melodyDB").collection("enrolledCollection");
-=======
     const instructorsCollection = client.db("melodyDB").collection("instructorsCollection");
     const paymentCollection = client.db('melodyDB').collection('paymentCollection');
->>>>>>> parent of caba563 (updated)
     
 
 
@@ -280,14 +275,6 @@ async function run() {
       const payment = req.body;
       const insertResult = await paymentCollection.insertOne(payment);
 
-      //increase enrolledStudents by 1
-      const updateEnrolledQuery={_id: {$in: [new ObjectId(payment.classId)]}}
-      const updateEnrolledStudents = await classesCollection.findOneAndUpdate(updateEnrolledQuery,  { $inc: { enrolledStudents: 1 } });
-
-      //decrease availableSeats by 1
-      const updateSeatsQuery={_id: {$in: [new ObjectId(payment.classId)]}}
-      const updateSeats = await classesCollection.findOneAndUpdate(updateSeatsQuery,  { $inc: { available_seats: -1 } });
-
       const query = {_id: {$in: [new ObjectId(payment.selectedClassId)]}}
       const deleteResult = await mySelectedClassCollection.deleteOne(query)
       res.send({insertResult, updateEnrolledStudents, updateSeats,  deleteResult});
@@ -297,54 +284,11 @@ async function run() {
 
 
 
-<<<<<<< HEAD
-    //--------------------- User Enrolled API --------------------------------
-
-
-    app.get('/enrolled', verifyJWT,  async(req, res) => {
-      const email= req.query.email;
-      const decodedEmail = req.decoded.email;
-
-      if (!email) {
-        res.send([]);
-      }
-
-      if (email !== decodedEmail) {
-        return res
-          .status(403)
-          .send({ error: true, message: "Forbidden Access" });
-      }
-
-      const query = { email: email };
-      const result = await enrolledCollection.find(query).toArray();
-      res.send(result);
-    })
-
-
-
-
-
-
     //------------------------  Payment History Related API  ------------------
 
 
-
-    app.get('/paymentHistory',verifyJWT,  async(req, res) => {
-      const email= req.query.email;
-      const decodedEmail = req.decoded.email;
-
-      if (!email) {
-        res.send([]);
-      }
-
-      if (email !== decodedEmail) {
-        return res
-          .status(403)
-          .send({ error: true, message: "Forbidden Access" });
-      }
-
-      const query = { email: email };
-      const result = await enrolledCollection.find(query).sort({date: -1}).toArray();
+    app.get('/paymentHistory', async(req, res) => {
+      const result = await paymentCollection.find().toArray();
       res.send(result);
     })
 
@@ -378,15 +322,9 @@ async function run() {
 
     //------------------  Popular Instructor API --------------------------
 
-    app.get('/instructors', async(req, res) => {
-      const result = await allUsersCollection.find().toArray();
-=======
-    //------------------------  Payment History Related API  ------------------
-
-
+  
     app.get('/paymentHistory', async(req, res) => {
       const result = await paymentCollection.find().toArray();
->>>>>>> parent of caba563 (updated)
       res.send(result);
     })
 
